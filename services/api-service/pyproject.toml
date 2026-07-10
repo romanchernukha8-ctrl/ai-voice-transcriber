@@ -11,6 +11,8 @@ dependencies = [
     "alembic>=1.16.4",
     "python-dotenv>=1.1.1",
     "pydantic-settings>=2.10.1",
+    "asyncpg>=0.31.0",
+    "greenlet>=3.5.3",
 ]
 
 [dependency-groups]

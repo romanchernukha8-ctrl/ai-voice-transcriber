@@ -5,6 +5,21 @@ class Settings(BaseSettings):
     project_name: str = "AI Voice Transcriber API"
     version: str = "0.1.0"
 
+    database_host: str
+    database_port: int
+    database_name: str
+    database_user: str
+    database_password: str
+
+    @property
+    def database_url(self) -> str:
+        return (
+            f"postgresql+asyncpg://"
+            f"{self.database_user}:{self.database_password}"
+            f"@{self.database_host}:{self.database_port}/"
+            f"{self.database_name}"
+        )
+
     model_config = SettingsConfigDict(
         env_file=".env",
         extra="ignore",

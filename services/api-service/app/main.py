@@ -2,6 +2,8 @@ from fastapi import FastAPI
 
 from app.api.v1.health import router as health_router
 from app.core.config import settings
+from app.api.v1.database import router as database_router
+
 
 app = FastAPI(
     title=settings.project_name,
@@ -9,6 +11,7 @@ app = FastAPI(
 )
 
 app.include_router(health_router)
+app.include_router(database_router)
 
 
 @app.get("/")
