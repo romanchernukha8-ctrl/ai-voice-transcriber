@@ -15,6 +15,7 @@ dependencies = [
     "email-validator>=2.3.0",
     "psycopg[binary]>=3.3.4",
     "pwdlib[argon2]>=0.3.0",
+    "shared",
 ]
 
 [dependency-groups]
@@ -29,3 +30,6 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]
+
+[tool.uv.sources]
+shared = { path = "../../shared", editable = true }
