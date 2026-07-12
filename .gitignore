@@ -15,9 +15,6 @@ venv/
 .idea/
 .vscode/
 
-# macOS / Linux
-.DS_Store
-
 # Testing
 .pytest_cache/
 .mypy_cache/
@@ -26,3 +23,6 @@ venv/
 # Coverage
 .coverage
 htmlcov/
+
+# OS
+.DS_Store
