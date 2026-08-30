@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: speech-worker
+  labels:
+    app.kubernetes.io/name: speech-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: speech-worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: speech-worker
+    spec:
+      containers:
+        - name: speech-worker
+          image: "{{ .Values.images.speechWorker.repository }}:{{ .Values.images.speechWorker.tag }}"
+          imagePullPolicy: {{ .Values.images.speechWorker.pullPolicy }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "ai-voice-transcriber.fullname" . }}-config
+            - secretRef:
+                name: {{ include "ai-voice-transcriber.fullname" . }}-secret

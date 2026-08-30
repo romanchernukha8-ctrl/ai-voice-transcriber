@@ -1,0 +1,65 @@
+replicaCount: 1
+
+images:
+  api:
+    repository: ai-voice-transcriber-api-service
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  fileService:
+    repository: ai-voice-transcriber-file-service
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  speechWorker:
+    repository: ai-voice-transcriber-speech-worker
+    tag: latest
+    pullPolicy: IfNotPresent
+
+services:
+  api:
+    port: 8000
+    targetPort: 8000
+
+  fileService:
+    port: 8000
+    targetPort: 8000
+
+postgres:
+  image: postgres:17
+  database: voice_db
+  user: voice_user
+  port: 5432
+
+rabbitmq:
+  image: rabbitmq:4-management
+  host: rabbitmq
+  port: 5672
+  managementPort: 15672
+
+redis:
+  image: redis:8
+  host: redis
+  port: 6379
+
+minio:
+  image: quay.io/minio/minio:RELEASE.2025-07-23T15-54-02Z
+  host: minio
+  apiPort: 9000
+  consolePort: 9001
+  bucket: audio-files
+
+database:
+  host: postgres
+  name: voice_db
+  port: 5432
+
+secrets:
+  postgresUser: voice_user
+  postgresPassword: change-me
+  rabbitmqUser: voice_user
+  rabbitmqPassword: change-me
+  minioRootUser: minioadmin
+  minioRootPassword: change-me
+
+resources: {}
