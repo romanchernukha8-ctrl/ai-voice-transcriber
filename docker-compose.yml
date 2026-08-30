@@ -158,6 +158,12 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    environment:
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_NAME: ${FILE_DATABASE_NAME}
+      DATABASE_USER: ${POSTGRES_USER}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "${API_PORT}:8000"
     depends_on:
