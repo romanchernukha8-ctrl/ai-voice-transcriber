@@ -20,8 +20,13 @@ class FileRepository:
         )
         return result.scalar_one_or_none()
 
-    async def list(self) -> list[AudioFile]:
-        result = await self.db.execute(select(AudioFile))
+    async def list(self, owner_id: int) -> list[AudioFile]:
+        result = await self.db.execute(
+            select(AudioFile)
+            .where(AudioFile.owner_id == owner_id)
+            .order_by(AudioFile.created_at.desc())
+        )
+
         return list(result.scalars().all())
 
     async def update(self, file: AudioFile) -> AudioFile:

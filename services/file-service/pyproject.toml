@@ -10,6 +10,7 @@ dependencies = [
     "asyncpg>=0.31.0",
     "fastapi>=0.139.0",
     "minio>=7.2.20",
+    "pika>=1.4.1",
     "psycopg[binary]>=3.3.4",
     "pydantic-settings>=2.14.2",
     "python-dotenv>=1.2.2",

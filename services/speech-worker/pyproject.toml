@@ -1,0 +1,13 @@
+[project]
+name = "speech-worker"
+version = "0.1.0"
+description = "Speech processing worker for AI Voice Transcriber"
+requires-python = ">=3.12"
+dependencies = [
+    "asyncpg>=0.31.0",
+    "faster-whisper>=1.2.1",
+    "minio>=7.2.20",
+    "pika>=1.3.2",
+    "pydantic-settings>=2.15.0",
+    "sqlalchemy>=2.0.52",
+]
