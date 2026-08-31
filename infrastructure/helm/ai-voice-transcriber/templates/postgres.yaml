@@ -55,6 +55,12 @@ spec:
           volumeMounts:
             - name: postgres-data
               mountPath: /var/lib/postgresql/data
+            - name: postgres-init
+              mountPath: /docker-entrypoint-initdb.d/init.sql
+              subPath: init.sql
       volumes:
         - name: postgres-data
           emptyDir: {}
+        - name: postgres-init
+          configMap:
+            name: {{ include "ai-voice-transcriber.fullname" . }}-postgres-init

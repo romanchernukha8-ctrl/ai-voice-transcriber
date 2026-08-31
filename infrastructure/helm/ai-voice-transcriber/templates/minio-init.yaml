@@ -1,0 +1,52 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "ai-voice-transcriber.fullname" . }}-minio-init
+  labels:
+    {{- include "ai-voice-transcriber.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  template:
+    metadata:
+      labels:
+        {{- include "ai-voice-transcriber.selectorLabels" . | nindent 8 }}
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: minio-init
+          image: minio/mc:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              until mc alias set minio http://minio:9000 "$MINIO_ACCESS_KEY" "$MINIO_SECRET_KEY"; do
+                echo "Waiting for MinIO..."
+                sleep 2
+              done
+
+              until mc ready minio; do
+                echo "Waiting for MinIO to become ready..."
+                sleep 2
+              done
+
+              mc mb --ignore-existing minio/"$MINIO_BUCKET"
+
+              echo "MinIO bucket '$MINIO_BUCKET' is ready."
+          env:
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ai-voice-transcriber.fullname" . }}-secret
+                  key: MINIO_ACCESS_KEY
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ai-voice-transcriber.fullname" . }}-secret
+                  key: MINIO_SECRET_KEY
+            - name: MINIO_BUCKET
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "ai-voice-transcriber.fullname" . }}-config
+                  key: MINIO_BUCKET

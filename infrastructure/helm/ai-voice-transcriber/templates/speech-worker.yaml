@@ -18,6 +18,11 @@ spec:
         - name: speech-worker
           image: "{{ .Values.images.speechWorker.repository }}:{{ .Values.images.speechWorker.tag }}"
           imagePullPolicy: {{ .Values.images.speechWorker.pullPolicy }}
+
+          env:
+            - name: DATABASE_NAME
+              value: "file_db"
+
           envFrom:
             - configMapRef:
                 name: {{ include "ai-voice-transcriber.fullname" . }}-config
