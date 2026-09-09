@@ -1,0 +1,116 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, Helvetica, sans-serif;
+  background: #f4f6f8;
+  color: #1f2937;
+}
+
+.app {
+  min-height: 100vh;
+  padding: 60px 20px;
+}
+
+.container {
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.header h1 {
+  margin: 0 0 12px;
+  font-size: 36px;
+}
+
+.header p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 17px;
+}
+
+.upload-card,
+.status-card,
+.transcription-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 20px;
+}
+
+.file-label {
+  display: block;
+  margin-bottom: 12px;
+  font-weight: 600;
+}
+
+input[type="file"] {
+  display: block;
+  width: 100%;
+  margin-bottom: 20px;
+}
+
+.selected-file {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 20px;
+  padding: 12px;
+  background: #f9fafb;
+  border-radius: 8px;
+}
+
+.selected-file span {
+  color: #6b7280;
+  font-size: 14px;
+}
+
+button {
+  width: 100%;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 8px;
+  background: #111827;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  background: #374151;
+}
+
+button:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+}
+
+.status-card h2,
+.transcription-card h2 {
+  margin-top: 0;
+}
+
+.status-card p {
+  margin-bottom: 0;
+  color: #6b7280;
+}
+
+.transcription-text {
+  min-height: 180px;
+  padding: 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f9fafb;
+  color: #6b7280;
+  white-space: pre-wrap;
+  line-height: 1.6;
+}
