@@ -151,6 +151,29 @@ services:
     networks:
       - voice-network
 
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - voice-network
+
+  ai-worker:
+    build:
+      context: ./services/ai-worker
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      OLLAMA_URL: http://ollama:11434
+      OLLAMA_MODEL: llama3:latest
+    ports:
+      - "8004:8000"
+    depends_on:
+      ollama:
+        condition: service_started
+    networks:
+      - voice-network
 
   api-service:
     build:
@@ -176,6 +199,7 @@ volumes:
   rabbitmq_data:
   redis_data:
   minio_data:
+  ollama_data:
 
 networks:
   voice-network:

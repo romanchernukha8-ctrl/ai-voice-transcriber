@@ -150,10 +150,23 @@ function App() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          prompt: `Summarize the following transcription clearly and concisely.
+          prompt: `You are a transcription assistant.
 
-Transcription:
-${transcription}`,
+Your task is to summarize the provided transcription.
+
+IMPORTANT RULES:
+- Use ONLY information explicitly present in the transcription.
+- Do NOT invent or assume any facts.
+- Do NOT add information from your own knowledge.
+- Do NOT invent people, companies, products, events, dates, numbers, or intentions.
+- If the transcription is unclear or incomplete, say so.
+- Keep the summary concise and factual.
+- Focus on the main topic, important points, decisions, and conclusions.
+
+TRANSCRIPTION:
+${transcription}
+
+SUMMARY:`,
         }),
       });
 
@@ -186,15 +199,24 @@ ${transcription}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          prompt: `Answer the user's question based only on the following transcription.
+          prompt: `You are an assistant that answers questions about a transcription.
 
-Transcription:
+IMPORTANT RULES:
+- Answer ONLY using information explicitly contained in the transcription.
+- Do NOT use outside knowledge.
+- Do NOT guess or invent information.
+- If the answer is not present in the transcription, say:
+  "The transcription does not contain this information."
+- If the transcription is unclear, say that it is unclear.
+- Keep the answer concise and factual.
+
+TRANSCRIPTION:
 ${transcription}
 
-User question:
+USER QUESTION:
 ${question}
 
-Give a clear and useful answer.`,
+ANSWER:`,
         }),
       });
 
