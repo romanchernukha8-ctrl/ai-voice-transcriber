@@ -42,6 +42,18 @@ async def list_files():
     return response.json()
 
 
+@router.get("/{file_id}")
+async def get_file(file_id: int):
+    async with httpx.AsyncClient() as client:
+        response = await client.get(
+            f"{FILE_SERVICE_URL}/api/v1/files/{file_id}",
+            timeout=30.0,
+        )
+
+    response.raise_for_status()
+    return response.json()
+
+
 @router.get("/{file_id}/transcription")
 async def get_transcription(file_id: int):
     async with httpx.AsyncClient() as client:

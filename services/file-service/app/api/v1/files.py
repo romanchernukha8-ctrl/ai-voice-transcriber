@@ -54,7 +54,6 @@ async def list_files(
     db: AsyncSession = Depends(get_db),
 ):
     repository = FileRepository(db)
-
     storage = StorageService()
 
     service = FileService(
@@ -65,6 +64,35 @@ async def list_files(
     # Временно используем owner_id = 1
     # После подключения JWT заменим на current_user.id
     return await service.list(owner_id=1)
+
+
+@router.get(
+    "/{file_id}",
+    response_model=FileResponse,
+    summary="Get file status",
+)
+async def get_file(
+    file_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    repository = FileRepository(db)
+    storage = StorageService()
+
+    service = FileService(
+        repository=repository,
+        storage=storage,
+    )
+
+    file = await service.get(file_id)
+
+    if file is None:
+        raise HTTPException(
+            status_code=404,
+            detail="File not found",
+        )
+
+    return file
+
 
 @router.get(
     "/{file_id}/transcription",

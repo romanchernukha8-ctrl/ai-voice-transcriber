@@ -38,7 +38,8 @@ body {
 
 .upload-card,
 .status-card,
-.transcription-card {
+.transcription-card,
+.assistant-card {
   background: #ffffff;
   border: 1px solid #e5e7eb;
   border-radius: 12px;
@@ -95,7 +96,8 @@ button:disabled {
 }
 
 .status-card h2,
-.transcription-card h2 {
+.transcription-card h2,
+.assistant-card h2 {
   margin-top: 0;
 }
 
@@ -113,4 +115,58 @@ button:disabled {
   color: #6b7280;
   white-space: pre-wrap;
   line-height: 1.6;
+}
+
+.transcription-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.transcription-actions button {
+  flex: 1;
+}
+
+.assistant-card p {
+  color: #6b7280;
+  margin-bottom: 20px;
+}
+
+.assistant-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.assistant-actions button {
+  flex: 1;
+}
+
+.assistant-result {
+  margin-top: 16px;
+  min-height: 100px;
+  padding: 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f9fafb;
+  color: #6b7280;
+  white-space: pre-wrap;
+  line-height: 1.6;
+}
+.ask-ai {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.ask-ai input {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 16px;
+}
+
+.ask-ai input:focus {
+  outline: none;
+  border-color: #888;
 }

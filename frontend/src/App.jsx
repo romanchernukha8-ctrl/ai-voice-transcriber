@@ -4,10 +4,17 @@ import "./App.css";
 function App() {
   const [file, setFile] = useState(null);
   const [status, setStatus] = useState("Waiting for an audio file...");
+  const [language, setLanguage] = useState("");
   const [transcription, setTranscription] = useState(
     "Your transcription will appear here.",
   );
-  const [uploading, setUploading] = useState(false);
+  const [processing, setProcessing] = useState(false);
+
+  const [assistantResult, setAssistantResult] = useState(
+    "AI assistant response will appear here.",
+  );
+  const [question, setQuestion] = useState("");
+  const [assistantLoading, setAssistantLoading] = useState(false);
 
   const handleFileChange = (event) => {
     const selectedFile = event.target.files[0];
@@ -15,18 +22,24 @@ function App() {
     if (selectedFile) {
       setFile(selectedFile);
       setStatus("Ready to upload");
+      setLanguage("");
       setTranscription("Your transcription will appear here.");
+      setAssistantResult("AI assistant response will appear here.");
+      setQuestion("");
     }
   };
 
   const handleUpload = async () => {
-    if (!file || uploading) {
+    if (!file || processing) {
       return;
     }
 
-    setUploading(true);
+    setProcessing(true);
     setStatus("Uploading...");
+    setLanguage("");
     setTranscription("Waiting for transcription...");
+    setAssistantResult("AI assistant response will appear here.");
+    setQuestion("");
 
     try {
       const formData = new FormData();
@@ -46,9 +59,9 @@ function App() {
 
       setStatus("Processing...");
 
-      let completed = false;
+      const maxAttempts = 150;
 
-      while (!completed) {
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
         await new Promise((resolve) => setTimeout(resolve, 2000));
 
         const transcriptionResponse = await fetch(
@@ -58,21 +71,144 @@ function App() {
         if (transcriptionResponse.ok) {
           const result = await transcriptionResponse.json();
 
+          setLanguage(result.language || "");
           setTranscription(result.text);
           setStatus("Completed");
-          completed = true;
-        } else if (transcriptionResponse.status === 404) {
-          setStatus("Processing...");
-        } else {
-          throw new Error("Failed to get transcription");
+          setProcessing(false);
+
+          return;
         }
+
+        if (transcriptionResponse.status === 404) {
+          setStatus("Processing...");
+          continue;
+        }
+
+        throw new Error("Failed to get transcription");
       }
+
+      throw new Error("Transcription timeout");
     } catch (error) {
       console.error(error);
       setStatus("Failed");
       setTranscription("Something went wrong.");
     } finally {
-      setUploading(false);
+      setProcessing(false);
+    }
+  };
+
+  const hasTranscription =
+    transcription &&
+    transcription !== "Your transcription will appear here." &&
+    transcription !== "Waiting for transcription..." &&
+    transcription !== "Something went wrong.";
+
+  const handleCopy = async () => {
+    if (!hasTranscription) return;
+
+    try {
+      await navigator.clipboard.writeText(transcription);
+    } catch (error) {
+      console.error("Copy failed:", error);
+    }
+  };
+
+  const handleDownload = () => {
+    if (!hasTranscription) return;
+
+    const blob = new Blob([transcription], {
+      type: "text/plain;charset=utf-8",
+    });
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = file
+      ? `${file.name.replace(/\.[^/.]+$/, "")}.txt`
+      : "transcription.txt";
+
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+
+    URL.revokeObjectURL(url);
+  };
+
+  const handleSummarize = async () => {
+    if (!hasTranscription || assistantLoading) {
+      return;
+    }
+
+    setAssistantLoading(true);
+    setAssistantResult("Generating summary...");
+
+    try {
+      const response = await fetch("/ai/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          prompt: `Summarize the following transcription clearly and concisely.
+
+Transcription:
+${transcription}`,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("AI request failed");
+      }
+
+      const data = await response.json();
+      setAssistantResult(data.response);
+    } catch (error) {
+      console.error(error);
+      setAssistantResult("Failed to get a response from AI.");
+    } finally {
+      setAssistantLoading(false);
+    }
+  };
+
+  const handleAskAI = async () => {
+    if (!hasTranscription || !question.trim() || assistantLoading) {
+      return;
+    }
+
+    setAssistantLoading(true);
+    setAssistantResult("AI is thinking...");
+
+    try {
+      const response = await fetch("/ai/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          prompt: `Answer the user's question based only on the following transcription.
+
+Transcription:
+${transcription}
+
+User question:
+${question}
+
+Give a clear and useful answer.`,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("AI request failed");
+      }
+
+      const data = await response.json();
+      setAssistantResult(data.response);
+    } catch (error) {
+      console.error(error);
+      setAssistantResult("Failed to get a response from AI.");
+    } finally {
+      setAssistantLoading(false);
     }
   };
 
@@ -94,7 +230,7 @@ function App() {
             type="file"
             accept="audio/*"
             onChange={handleFileChange}
-            disabled={uploading}
+            disabled={processing}
           />
 
           {file && (
@@ -107,20 +243,89 @@ function App() {
           <button
             type="button"
             onClick={handleUpload}
-            disabled={!file || uploading}
+            disabled={!file || processing}
           >
-            {uploading ? "Processing..." : "Upload"}
+            {processing ? "Processing..." : "Upload"}
           </button>
         </section>
 
         <section className="status-card">
           <h2>Status</h2>
           <p>{status}</p>
+
+          {language && (
+            <p>
+              <strong>Language:</strong> {language}
+            </p>
+          )}
         </section>
 
         <section className="transcription-card">
           <h2>Transcription</h2>
+
           <div className="transcription-text">{transcription}</div>
+
+          <div className="transcription-actions">
+            <button
+              type="button"
+              onClick={handleCopy}
+              disabled={!hasTranscription}
+            >
+              Copy
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDownload}
+              disabled={!hasTranscription}
+            >
+              Download TXT
+            </button>
+          </div>
+        </section>
+
+        <section className="assistant-card">
+          <h2>AI Assistant</h2>
+
+          <p>
+            Ask questions about your transcription or generate a summary.
+          </p>
+
+          <div className="assistant-actions">
+            <button
+              type="button"
+              onClick={handleSummarize}
+              disabled={!hasTranscription || assistantLoading}
+            >
+              {assistantLoading ? "Processing..." : "Summarize"}
+            </button>
+          </div>
+
+          <div className="ask-ai">
+            <input
+              type="text"
+              placeholder="Ask something about the transcription..."
+              value={question}
+              onChange={(event) => setQuestion(event.target.value)}
+              disabled={!hasTranscription || assistantLoading}
+            />
+
+            <button
+              type="button"
+              onClick={handleAskAI}
+              disabled={
+                !hasTranscription ||
+                !question.trim() ||
+                assistantLoading
+              }
+            >
+              Ask AI
+            </button>
+          </div>
+
+          <div className="assistant-result">
+            {assistantResult}
+          </div>
         </section>
       </main>
     </div>

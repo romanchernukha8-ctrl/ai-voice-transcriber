@@ -7,6 +7,7 @@ import pika
 from app.config import settings
 from app.db.session import async_session_factory
 from app.repositories.transcription_repository import TranscriptionRepository
+from app.repositories.file_repository import FileRepository
 from app.services.transcription_service import TranscriptionService
 from app.storage.service import StorageService
 
@@ -35,6 +36,26 @@ class RabbitConsumer:
 
         self.storage = StorageService()
         self.transcription_service = TranscriptionService()
+
+    async def update_file_status(
+        self,
+        file_id: int,
+        status: str,
+    ):
+        async with async_session_factory() as session:
+            repository = FileRepository(session)
+
+            file = await repository.update_status(
+                file_id=file_id,
+                status=status,
+            )
+
+            if file is None:
+                raise ValueError(
+                    f"Audio file not found: {file_id}"
+                )
+
+            return file
 
     async def save_transcription(
         self,
@@ -65,6 +86,16 @@ class RabbitConsumer:
         print(message)
 
         try:
+            # Mark file as processing immediately
+            asyncio.run(
+                self.update_file_status(
+                    file_id=file_id,
+                    status="processing",
+                )
+            )
+
+            print("File status: processing")
+
             # 1. Download audio from MinIO
             self.storage.download_file(
                 object_name=object_name,
@@ -102,6 +133,16 @@ class RabbitConsumer:
                 f"file_id={transcription.file_id}"
             )
 
+            # Mark file as completed
+            asyncio.run(
+                self.update_file_status(
+                    file_id=file_id,
+                    status="completed",
+                )
+            )
+
+            print("File status: completed")
+
             # 4. Acknowledge RabbitMQ message
             ch.basic_ack(
                 delivery_tag=method.delivery_tag,
@@ -111,6 +152,22 @@ class RabbitConsumer:
 
         except Exception as exc:
             print(f"Error processing message: {exc}")
+
+            try:
+                asyncio.run(
+                    self.update_file_status(
+                        file_id=file_id,
+                        status="failed",
+                    )
+                )
+
+                print("File status: failed")
+
+            except Exception as status_exc:
+                print(
+                    f"Failed to update file status: "
+                    f"{status_exc}"
+                )
 
             # Do not acknowledge failed message.
             # Requeue it so RabbitMQ can deliver it again.

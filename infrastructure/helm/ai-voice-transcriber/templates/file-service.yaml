@@ -36,6 +36,21 @@ spec:
           ports:
             - containerPort: {{ .Values.services.fileService.targetPort }}
               protocol: TCP
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.services.fileService.targetPort }}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.services.fileService.targetPort }}
+            initialDelaySeconds: 5
+            periodSeconds: 5
+
           envFrom:
             - configMapRef:
                 name: {{ include "ai-voice-transcriber.fullname" . }}-config
