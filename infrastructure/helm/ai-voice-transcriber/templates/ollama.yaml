@@ -22,6 +22,25 @@ spec:
           ports:
             - containerPort: 11434
 
+          startupProbe:
+            httpGet:
+              path: /api/tags
+              port: 11434
+            failureThreshold: 30
+            periodSeconds: 10
+
+          livenessProbe:
+            httpGet:
+              path: /api/tags
+              port: 11434
+            periodSeconds: 30
+
+          readinessProbe:
+            httpGet:
+              path: /api/tags
+              port: 11434
+            periodSeconds: 10
+
           volumeMounts:
             - name: ollama-data
               mountPath: /root/.ollama
