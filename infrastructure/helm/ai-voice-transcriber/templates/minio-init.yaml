@@ -17,6 +17,7 @@ spec:
       containers:
         - name: minio-init
           image: minio/mc:latest
+          imagePullPolicy: IfNotPresent
           command:
             - /bin/sh
             - -c

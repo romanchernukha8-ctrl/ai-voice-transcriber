@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-worker
+  labels:
+    app.kubernetes.io/name: ai-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ai-worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ai-worker
+    spec:
+      containers:
+        - name: ai-worker
+          image: "{{ .Values.images.aiWorker.repository }}:{{ .Values.images.aiWorker.tag }}"
+          imagePullPolicy: {{ .Values.images.aiWorker.pullPolicy }}
+
+          ports:
+            - containerPort: 8000
+
+          env:
+            - name: OLLAMA_URL
+              value: "http://ollama:11434"
+            - name: OLLAMA_MODEL
+              value: "llama3:latest"

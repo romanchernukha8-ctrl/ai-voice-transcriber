@@ -16,6 +16,16 @@ images:
     tag: latest
     pullPolicy: IfNotPresent
 
+  aiWorker:
+    repository: ai-voice-transcriber-ai-worker
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  ollama:
+    repository: ollama/ollama
+    tag: latest
+    pullPolicy: IfNotPresent
+
 services:
   api:
     port: 8000
