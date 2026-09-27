@@ -19,13 +19,25 @@ class RabbitConsumer:
             settings.rabbitmq_password,
         )
 
-        self.connection = pika.BlockingConnection(
-            pika.ConnectionParameters(
-                host=settings.rabbitmq_host,
-                port=settings.rabbitmq_port,
-                credentials=credentials,
-            )
-        )
+        while True:
+            try:
+                print("Connecting to RabbitMQ...")
+
+                self.connection = pika.BlockingConnection(
+                    pika.ConnectionParameters(
+                        host=settings.rabbitmq_host,
+                        port=settings.rabbitmq_port,
+                        credentials=credentials,
+                    )
+                )
+
+                print("RabbitMQ connection established.")
+                break
+
+            except Exception as exc:
+                print(f"RabbitMQ connection failed: {exc}")
+                print("Retrying in 5 seconds...")
+                asyncio.run(asyncio.sleep(5))
 
         self.channel = self.connection.channel()
 
