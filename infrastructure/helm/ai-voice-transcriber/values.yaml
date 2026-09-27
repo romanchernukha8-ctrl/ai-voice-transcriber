@@ -26,6 +26,11 @@ images:
     tag: latest
     pullPolicy: IfNotPresent
 
+  frontend:
+    repository: ai-voice-transcriber-frontend
+    tag: latest
+    pullPolicy: IfNotPresent
+
 services:
   api:
     port: 8000
@@ -34,6 +39,10 @@ services:
   fileService:
     port: 8000
     targetPort: 8000
+
+  frontend:
+    port: 80
+    targetPort: 80
 
 postgres:
   image: postgres:17
