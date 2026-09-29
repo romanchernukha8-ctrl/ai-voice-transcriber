@@ -29,6 +29,24 @@ spec:
       labels:
         app.kubernetes.io/name: file-service
     spec:
+
+      initContainers:
+        - name: file-service-migrations
+          image: "{{ .Values.images.fileService.repository }}:{{ .Values.images.fileService.tag }}"
+          imagePullPolicy: {{ .Values.images.fileService.pullPolicy }}
+          command:
+            - uv
+            - run
+            - --no-dev
+            - alembic
+            - upgrade
+            - head
+          envFrom:
+            - configMapRef:
+                name: {{ include "ai-voice-transcriber.fullname" . }}-config
+            - secretRef:
+                name: {{ include "ai-voice-transcriber.fullname" . }}-secret
+
       containers:
         - name: file-service
           image: "{{ .Values.images.fileService.repository }}:{{ .Values.images.fileService.tag }}"

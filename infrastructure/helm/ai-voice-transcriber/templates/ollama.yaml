@@ -22,6 +22,14 @@ spec:
           ports:
             - containerPort: 11434
 
+          resources:
+            requests:
+              memory: "6Gi"
+              cpu: "1"
+            limits:
+              memory: "8Gi"
+              cpu: "4"
+
           startupProbe:
             httpGet:
               path: /api/tags
