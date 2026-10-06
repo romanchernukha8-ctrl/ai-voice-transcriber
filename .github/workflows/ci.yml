@@ -46,3 +46,49 @@ jobs:
       - name: Build frontend
         working-directory: frontend
         run: npm run build
+
+  docker-build:
+    name: Docker Build
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        include:
+          - name: api-service
+            context: ./services/api-service
+            dockerfile: ./services/api-service/Dockerfile
+
+          - name: file-service
+            context: ./services/file-service
+            dockerfile: ./services/file-service/Dockerfile
+
+          - name: speech-worker
+            context: ./services/speech-worker
+            dockerfile: ./services/speech-worker/Dockerfile
+
+          - name: ai-worker
+            context: ./services/ai-worker
+            dockerfile: ./services/ai-worker/Dockerfile
+
+          - name: auth-service
+            context: ./services/auth-service
+            dockerfile: ./services/auth-service/Dockerfile
+
+          - name: frontend
+            context: ./frontend
+            dockerfile: ./frontend/Dockerfile
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: false
+          tags: ai-voice-transcriber-${{ matrix.name }}:ci
