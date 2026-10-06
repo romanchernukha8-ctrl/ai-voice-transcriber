@@ -55,15 +55,15 @@ jobs:
       matrix:
         include:
           - name: api-service
-            context: ./services/api-service
+            context: .
             dockerfile: ./services/api-service/Dockerfile
 
           - name: file-service
-            context: ./services/file-service
+            context: .
             dockerfile: ./services/file-service/Dockerfile
 
           - name: speech-worker
-            context: ./services/speech-worker
+            context: .
             dockerfile: ./services/speech-worker/Dockerfile
 
           - name: ai-worker
@@ -71,7 +71,7 @@ jobs:
             dockerfile: ./services/ai-worker/Dockerfile
 
           - name: auth-service
-            context: ./services/auth-service
+            context: .
             dockerfile: ./services/auth-service/Dockerfile
 
           - name: frontend
