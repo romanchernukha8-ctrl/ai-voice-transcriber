@@ -32,7 +32,17 @@ def test_health():
     assert response.json() == {"status": "healthy"}
 
 
-def test_get_transcription_not_found():
+def test_get_transcription_not_found(monkeypatch):
+    from app.api.v1.files import get_transcription
+
+    async def mock_get_by_file_id(self, file_id):
+        return None
+
+    monkeypatch.setattr(
+        "app.services.transcription_service.TranscriptionService.get_by_file_id",
+        mock_get_by_file_id,
+    )
+
     response = client.get("/api/v1/files/999/transcription")
 
     assert response.status_code == 404
