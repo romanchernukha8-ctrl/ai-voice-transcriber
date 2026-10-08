@@ -1,24 +1,44 @@
-import asyncio
+import uuid
+
+import pytest
 
 from app.db.session import async_session_factory
+from app.models.audio_file import AudioFile
 from app.repositories.transcription_repository import TranscriptionRepository
 
 
+@pytest.mark.asyncio
 async def test_create_transcription():
     async with async_session_factory() as session:
+        object_name = f"test-transcription-{uuid.uuid4()}.mp3"
+
+        audio_file = AudioFile(
+            owner_id=1,
+            filename="test-audio.mp3",
+            object_name=object_name,
+            content_type="audio/mpeg",
+            status="uploaded",
+        )
+
+        session.add(audio_file)
+        await session.commit()
+        await session.refresh(audio_file)
+
         repository = TranscriptionRepository(session)
 
         transcription = await repository.create(
-            file_id=3,
+            file_id=audio_file.id,
             text="This is a test transcription.",
             language="en",
         )
 
-        print(f"Transcription created: id={transcription.id}")
-        print(f"File ID: {transcription.file_id}")
-        print(f"Text: {transcription.text}")
-        print(f"Language: {transcription.language}")
+        assert transcription.id is not None
+        assert transcription.file_id == audio_file.id
+        assert transcription.text == "This is a test transcription."
+        assert transcription.language == "en"
 
+        await session.delete(transcription)
+        await session.flush()
 
-if __name__ == "__main__":
-    asyncio.run(test_create_transcription())
+        await session.delete(audio_file)
+        await session.commit()

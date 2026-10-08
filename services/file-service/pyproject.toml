@@ -22,3 +22,9 @@ dependencies = [
 
 [tool.uv.sources]
 shared = { path = "../../shared", editable = true }
+
+[dependency-groups]
+dev = [
+    "httpx2>=2.13.1",
+    "pytest>=9.1.1",
+]

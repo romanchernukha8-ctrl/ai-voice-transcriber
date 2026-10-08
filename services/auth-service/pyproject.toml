@@ -23,6 +23,7 @@ dev = [
     "pytest>=9.1.1",
     "ruff>=0.15.21",
     "mypy>=2.2.0",
+    "httpx2>=2.13.1",
 ]
 
 [tool.ruff]
@@ -33,3 +34,6 @@ select = ["E", "F", "I"]
 
 [tool.uv.sources]
 shared = { path = "../../shared", editable = true }
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
