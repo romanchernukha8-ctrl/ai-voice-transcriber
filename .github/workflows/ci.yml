@@ -104,6 +104,7 @@ jobs:
       DATABASE_NAME: test
       DATABASE_USER: test
       DATABASE_PASSWORD: test
+      FILE_DATABASE_NAME: test
 
     steps:
       - name: Checkout
