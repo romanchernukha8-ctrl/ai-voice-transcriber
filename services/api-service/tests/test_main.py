@@ -21,7 +21,7 @@ def test_root():
 
     data = response.json()
 
-    assert data["service"] == "AI Voice Transcriber Platform"
+    assert data["service"] == "AI Voice Transcriber API"
     assert data["version"] == "0.1.0"
     assert data["status"] == "running"
 
