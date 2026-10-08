@@ -2,13 +2,18 @@ import uuid
 
 import pytest
 
-from app.db.session import async_session_factory
+from app.db.base import Base
+from app.db.session import async_session_factory, engine
 from app.models.audio_file import AudioFile
+from app.models.transcription import Transcription
 from app.repositories.transcription_repository import TranscriptionRepository
 
 
 @pytest.mark.asyncio
 async def test_create_transcription():
+    async with engine.begin() as connection:
+        await connection.run_sync(Base.metadata.create_all)
+
     async with async_session_factory() as session:
         object_name = f"test-transcription-{uuid.uuid4()}.mp3"
 
