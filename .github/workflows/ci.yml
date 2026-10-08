@@ -105,6 +105,10 @@ jobs:
       DATABASE_USER: test
       DATABASE_PASSWORD: test
       FILE_DATABASE_NAME: test
+      AUTH_DATABASE_NAME: test
+      JWT_SECRET_KEY: ci-test-secret-key-not-for-production
+      JWT_ALGORITHM: HS256
+      JWT_ACCESS_TOKEN_EXPIRE_MINUTES: 30
 
     steps:
       - name: Checkout
