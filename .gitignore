@@ -31,3 +31,6 @@ htmlcov/
 # Frontend port-forward runtime files
 .frontend-port-forward.log
 .frontend-port-forward.pid
+
+# Frontend
+frontend/coverage/
