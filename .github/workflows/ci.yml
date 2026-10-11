@@ -292,12 +292,18 @@ jobs:
 
           if helm status "$RELEASE_NAME" -n "$NAMESPACE" >/dev/null 2>&1; then
             REVISION="$(helm history "$RELEASE_NAME" -n "$NAMESPACE" -o json \
-              | python3 -c 'import json,sys; print(max(int(r["revision"]) for r in json.load(sys.stdin)))')"
+              | python3 -c 'import json,sys; rows=json.load(sys.stdin); valid=[int(r["revision"]) for r in rows if r.get("status", "").lower() in {"deployed", "superseded"}]; print(max(valid) if valid else 0)')"
+
+            if [ "$REVISION" -le 0 ]; then
+              echo "::error::Existing Helm release found, but no successful revision could be determined. Aborting before deployment."
+              exit 1
+            fi
+
             echo "PREVIOUS_REVISION=$REVISION" >> "$GITHUB_ENV"
-            echo "Current Helm revision: $REVISION"
+            echo "Last successful Helm revision: $REVISION"
           else
             echo "PREVIOUS_REVISION=0" >> "$GITHUB_ENV"
-            echo "No previous release; rollback will uninstall the new release."
+            echo "No existing Helm release; first installation will be attempted."
           fi
 
       - name: Deploy with Helm
@@ -378,17 +384,21 @@ jobs:
         if: failure()
         shell: bash
         run: |
-          set +e
+          set -euo pipefail
 
           if [ "$PREVIOUS_REVISION" -gt 0 ]; then
             echo "Rolling back to Helm revision $PREVIOUS_REVISION"
-            helm rollback "$RELEASE_NAME" "$PREVIOUS_REVISION" \
-              -n "$NAMESPACE" --wait --timeout 5m
+            if ! helm rollback "$RELEASE_NAME" "$PREVIOUS_REVISION" \
+              -n "$NAMESPACE" --wait --timeout 5m; then
+              echo "::error::Helm rollback failed. Manual recovery is required."
+              exit 1
+            fi
           elif helm status "$RELEASE_NAME" -n "$NAMESPACE" >/dev/null 2>&1; then
             echo "No previous revision; uninstalling failed installation."
-            helm uninstall "$RELEASE_NAME" -n "$NAMESPACE" --wait
+            if ! helm uninstall "$RELEASE_NAME" -n "$NAMESPACE" --wait; then
+              echo "::error::Helm uninstall failed. Manual recovery is required."
+              exit 1
+            fi
           else
             echo "No Helm release exists; nothing to roll back."
           fi
-
-          exit 0
