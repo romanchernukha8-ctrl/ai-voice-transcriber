@@ -55,3 +55,10 @@ spec:
                 secretKeyRef:
                   name: {{ include "ai-voice-transcriber.fullname" . }}-secret
                   key: MINIO_SECRET_KEY
+          volumeMounts:
+            - name: minio-data
+              mountPath: /data
+      volumes:
+        - name: minio-data
+          persistentVolumeClaim:
+            claimName: minio-data

@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ai-voice-transcriber.fullname" . }}-auth-service
+  labels:
+    {{- include "ai-voice-transcriber.labels" . | nindent 4 }}
+    app.kubernetes.io/component: auth-service
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: auth-service
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: auth-service
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: auth-service
+    spec:
+      imagePullSecrets:
+        {{- toYaml .Values.imagePullSecrets | nindent 8 }}
+      containers:
+        - name: auth-service
+          image: "{{ .Values.images.authService.repository }}:{{ .Values.images.authService.tag }}"
+          imagePullPolicy: {{ .Values.images.authService.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ include "ai-voice-transcriber.fullname" . }}-config
+            - secretRef:
+                name: {{ include "ai-voice-transcriber.fullname" . }}-secret
+          env:
+            - name: AUTH_DATABASE_NAME
+              value: auth_db
+            - name: JWT_SECRET_KEY
+              value: {{ .Values.secrets.jwtSecretKey | quote }}
+            - name: JWT_ALGORITHM
+              value: {{ .Values.secrets.jwtAlgorithm | quote }}
+            - name: JWT_ACCESS_TOKEN_EXPIRE_MINUTES
+              value: {{ .Values.secrets.jwtAccessTokenExpireMinutes | quote }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-service
+  labels:
+    {{- include "ai-voice-transcriber.labels" . | nindent 4 }}
+    app.kubernetes.io/component: auth-service
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: auth-service
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+    - name: http
+      port: {{ .Values.services.auth.port }}
+      targetPort: {{ .Values.services.auth.targetPort }}
+      protocol: TCP

@@ -7,3 +7,4 @@ metadata:
 data:
   init.sql: |
     CREATE DATABASE file_db;
+    CREATE DATABASE auth_db;

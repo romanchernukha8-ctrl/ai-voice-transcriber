@@ -14,6 +14,8 @@ spec:
       labels:
         app.kubernetes.io/name: ai-worker
     spec:
+      imagePullSecrets:
+        {{- toYaml .Values.imagePullSecrets | nindent 8 }}
       containers:
         - name: ai-worker
           image: "{{ .Values.images.aiWorker.repository }}:{{ .Values.images.aiWorker.tag }}"

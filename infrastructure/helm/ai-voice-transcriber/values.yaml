@@ -1,5 +1,8 @@
 replicaCount: 1
 
+imagePullSecrets:
+  - name: ghcr-pull-secret
+
 images:
   api:
     repository: ai-voice-transcriber-api-service
@@ -8,6 +11,11 @@ images:
 
   fileService:
     repository: ai-voice-transcriber-file-service
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  authService:
+    repository: ai-voice-transcriber-auth-service
     tag: latest
     pullPolicy: IfNotPresent
 
@@ -40,6 +48,10 @@ services:
     port: 8000
     targetPort: 8000
 
+  auth:
+    port: 8000
+    targetPort: 8000
+
   frontend:
     port: 80
     targetPort: 80
@@ -67,6 +79,7 @@ minio:
   apiPort: 9000
   consolePort: 9001
   bucket: audio-files
+  persistenceSize: 10Gi
 
 database:
   host: postgres
@@ -80,5 +93,8 @@ secrets:
   rabbitmqPassword: change-me
   minioRootUser: minioadmin
   minioRootPassword: change-me
+  jwtSecretKey: change_this_to_a_long_random_secret_key
+  jwtAlgorithm: HS256
+  jwtAccessTokenExpireMinutes: 30
 
 resources: {}

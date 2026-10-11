@@ -29,6 +29,8 @@ spec:
       labels:
         app.kubernetes.io/name: api-service
     spec:
+      imagePullSecrets:
+        {{- toYaml .Values.imagePullSecrets | nindent 8 }}
       containers:
         - name: api-service
           image: "{{ .Values.images.api.repository }}:{{ .Values.images.api.tag }}"

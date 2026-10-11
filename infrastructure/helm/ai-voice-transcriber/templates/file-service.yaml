@@ -47,6 +47,8 @@ spec:
             - secretRef:
                 name: {{ include "ai-voice-transcriber.fullname" . }}-secret
 
+      imagePullSecrets:
+        {{- toYaml .Values.imagePullSecrets | nindent 8 }}
       containers:
         - name: file-service
           image: "{{ .Values.images.fileService.repository }}:{{ .Values.images.fileService.tag }}"
