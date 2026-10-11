@@ -2,329 +2,238 @@
 
 A local microservice-based platform for audio processing, speech-to-text transcription, and AI-powered text processing.
 
-The project is designed as a **DevOps / Kubernetes portfolio project** and demonstrates containerization, microservice architecture, asynchronous processing, persistent storage, Kubernetes deployment, Helm, monitoring, and CI/CD.
+**AI Voice Transcriber is a DevOps / Kubernetes portfolio project** demonstrating containerization, microservice architecture, asynchronous processing, persistent storage, Helm-based Kubernetes deployment, monitoring, automated testing, security scanning, and CI/CD.
 
----
+The current deployment target is a local environment built around **Docker, Minikube, Kubernetes, and Helm**. AWS deployment is outside the current implemented scope.
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Main Features](#main-features)
+- [Architecture and Data Flow](#architecture-and-data-flow)
+- [Technology Stack](#technology-stack)
+- [Services](#services)
+- [Project Structure](#project-structure)
+- [Quick Start](#quick-start)
+- [Kubernetes Deployment with Helm](#kubernetes-deployment-with-helm)
+- [Docker Compose](#docker-compose)
+- [Configuration and Persistent Data](#configuration-and-persistent-data)
+- [Monitoring](#monitoring)
+- [Testing](#testing)
+- [CI/CD Pipeline](#cicd-pipeline)
+- [Security](#security)
+- [Documentation](#documentation)
+- [Current Scope and Project Status](#current-scope-and-project-status)
+- [License](#license)
 
 ## Overview
 
-AI Voice Transcriber provides a pipeline for processing audio files:
+The application accepts audio files, stores them, processes transcription jobs asynchronously, and can send the resulting text to a local language model for AI-powered processing.
 
 ```text
-                    ┌──────────────┐
-                    │   Frontend   │
-                    │ React + Vite │
-                    └──────┬───────┘
-                           │
-                           ▼
-                    ┌──────────────┐
-                    │ API Service  │
-                    │   FastAPI    │
-                    └──────┬───────┘
-                           │
-             ┌─────────────┴─────────────┐
-             │                           │
-             ▼                           ▼
-      ┌──────────────┐           ┌──────────────┐
-      │ File Service │           │   Database   │
-      │   FastAPI    │           │ PostgreSQL   │
-      └──────┬───────┘           └──────────────┘
-             │
-             ▼
-      ┌──────────────┐
-      │    MinIO     │
-      │ Object Store │
-      └──────┬───────┘
-             │
-             ▼
-      ┌──────────────┐
-      │   RabbitMQ   │
-      │ speech_queue │
-      └──────┬───────┘
-             │
-             ▼
-      ┌──────────────┐
-      │Speech Worker │
-      │Faster-Whisper│
-      └──────┬───────┘
-             │
-             ▼
-      ┌──────────────┐
-      │ Transcription│
-      │   Database   │
-      └──────┬───────┘
-             │
-             ▼
-      ┌──────────────┐
-      │  AI Worker   │
-      │   FastAPI    │
-      └──────┬───────┘
-             │
-             ▼
-      ┌──────────────┐
-      │    Ollama    │
-      │ Local LLM    │
-      └──────────────┘
+                         ┌──────────────────┐
+                         │     Frontend     │
+                         │    React + Vite  │
+                         └────────┬─────────┘
+                                  │
+                                  ▼
+                         ┌──────────────────┐
+                         │   API Service    │
+                         │     FastAPI      │
+                         └────────┬─────────┘
+                                  │
+                     ┌────────────┴────────────┐
+                     ▼                         ▼
+            ┌─────────────────┐      ┌─────────────────┐
+            │  File Service   │      │   PostgreSQL    │
+            │     FastAPI     │      │ Application Data│
+            └────────┬────────┘      └─────────────────┘
+                     │
+                     ▼
+            ┌─────────────────┐
+            │      MinIO      │
+            │  Object Storage │
+            └────────┬────────┘
+                     │
+                     ▼
+            ┌─────────────────┐
+            │     RabbitMQ    │
+            │  Speech Queue   │
+            └────────┬────────┘
+                     │
+                     ▼
+            ┌─────────────────┐
+            │  Speech Worker  │
+            │  Faster-Whisper │
+            └────────┬────────┘
+                     │
+                     ▼
+            ┌─────────────────┐
+            │   PostgreSQL    │
+            │ Transcriptions  │
+            └────────┬────────┘
+                     │
+                     ▼
+            ┌─────────────────┐
+            │    AI Worker    │
+            └────────┬────────┘
+                     │
+                     ▼
+            ┌─────────────────┐
+            │     Ollama      │
+            │    Local LLM    │
+            └─────────────────┘
 ```
-
----
 
 ## Main Features
 
-- Audio file upload
-- Object storage using MinIO
-- PostgreSQL persistence
-- Asynchronous processing with RabbitMQ
-- Speech-to-text using Faster-Whisper
-- AI text processing using Ollama
-- React frontend
-- FastAPI microservices
-- Docker containerization
-- Kubernetes deployment with Minikube
-- Helm-based deployment
-- Persistent volumes
-- Health checks and Kubernetes probes
-- Prometheus / Grafana / Loki monitoring stack
-- GitHub Actions CI
-- Docker image build validation
-- Helm chart linting
-- Frontend build validation
+- Audio upload through the web interface.
+- Object storage using MinIO.
+- PostgreSQL persistence.
+- Asynchronous task processing through RabbitMQ.
+- Speech-to-text transcription using Faster-Whisper.
+- AI text processing through Ollama running locally.
+- React frontend and FastAPI-based services.
+- Docker containerization and Docker Compose support.
+- Kubernetes deployment with Minikube and Helm.
+- Persistent volumes for stateful components.
+- Kubernetes health probes.
+- Monitoring configuration for Prometheus, Grafana, and Loki.
+- Automated backend tests and frontend build validation.
+- CI security checks, dependency scanning, Helm validation, Kubernetes manifest validation, and container image scanning.
+- Automated deployment to a configured local Minikube environment through a self-hosted GitHub Actions runner.
 
----
+## Architecture and Data Flow
+
+The main transcription flow is:
+
+1. A user uploads an audio file through the frontend.
+2. The API and File Service handle the request.
+3. MinIO stores the audio file.
+4. A transcription job is placed on RabbitMQ.
+5. The Speech Worker consumes the job and processes the audio with Faster-Whisper.
+6. The transcription is stored in PostgreSQL.
+7. The AI Worker can send text to Ollama for local language-model processing.
 
 ## Technology Stack
 
-### Frontend
-
-- React
-- Vite
-- Nginx
-
-### Backend
-
-- Python
-- FastAPI
-- SQLAlchemy
-- Alembic
-- `uv`
-
-### Speech Processing
-
-- Faster-Whisper
-- RabbitMQ
-
-### AI
-
-- Ollama
-- Local LLM
-
-### Storage
-
-- PostgreSQL
-- MinIO
-- Redis
-
-### Infrastructure
-
-- Docker
-- Docker Compose
-- Kubernetes
-- Minikube
-- Helm
-
-### Monitoring
-
-- Prometheus
-- Grafana
-- Loki
-- Promtail / Grafana Alloy
-
-### CI/CD
-
-- GitHub Actions
-- Docker Buildx
-- Helm lint
-
----
+| Area | Technologies |
+|---|---|
+| Frontend | React, Vite, Nginx |
+| Backend | Python, FastAPI, SQLAlchemy, Alembic, `uv` |
+| Speech processing | Faster-Whisper |
+| Asynchronous messaging | RabbitMQ |
+| AI processing | Ollama, local language model |
+| Database | PostgreSQL |
+| Object storage | MinIO |
+| Cache / in-memory data | Redis |
+| Containers | Docker, Docker Compose, Docker Buildx |
+| Orchestration | Kubernetes, Minikube |
+| Deployment | Helm |
+| Monitoring | Prometheus, Grafana, Loki, Promtail / Grafana Alloy configuration |
+| CI/CD | GitHub Actions |
+| Security and validation | Gitleaks, OSV-Scanner, Trivy, Kubeconform, Helm lint |
 
 ## Services
 
 | Service | Purpose |
 |---|---|
-| `frontend` | React web interface |
+| `frontend` | React web interface served through Nginx |
 | `api-service` | Main API / gateway |
 | `auth-service` | Authentication service |
 | `file-service` | File upload and storage management |
-| `speech-worker` | Audio transcription using Faster-Whisper |
-| `ai-worker` | AI text processing |
+| `speech-worker` | Asynchronous audio transcription using Faster-Whisper |
+| `ai-worker` | AI text processing through Ollama |
 | `postgres` | Persistent relational database |
-| `rabbitmq` | Asynchronous message broker |
+| `rabbitmq` | Message broker for asynchronous jobs |
 | `redis` | In-memory data store |
 | `minio` | S3-compatible object storage |
-| `ollama` | Local LLM runtime |
-
----
+| `ollama` | Local language-model runtime |
 
 ## Project Structure
 
 ```text
 ai-voice-transcriber/
-│
 ├── .github/
 │   └── workflows/
 │       └── ci.yml
-│
 ├── docs/
 │   ├── 01-architecture/
+│   │   └── Architecture-Design-Document.md
 │   ├── 02-requirements/
-│   ├── 03-api/
-│   ├── 04-database/
-│   ├── 05-deployment/
-│   ├── 06-monitoring/
-│   ├── 07-security/
-│   ├── 08-testing/
-│   ├── 09-aws/
-│   ├── 10-adr/
-│   └── diagrams/
-│
+│   │   └── System-Requirements-Specification.md
+│   └── README.md
 ├── frontend/
-│   ├── src/
-│   ├── public/
-│   ├── Dockerfile
-│   ├── nginx.conf
-│   └── package.json
-│
 ├── infrastructure/
 │   ├── compose/
 │   ├── docker/
 │   ├── helm/
 │   │   └── ai-voice-transcriber/
 │   └── terraform/
-│
 ├── monitoring/
-│   ├── grafana/
-│   ├── loki/
-│   ├── prometheus/
-│   └── promtail/
-│
 ├── services/
 │   ├── api-service/
 │   ├── auth-service/
 │   ├── file-service/
 │   ├── speech-worker/
 │   └── ai-worker/
-│
 ├── shared/
-│   └── shared/
-│
 ├── tests/
-│
 ├── docker-compose.yml
 ├── start.sh
 ├── stop.sh
 ├── Makefile
 ├── CHANGELOG.md
+├── LICENSE
 └── README.md
 ```
 
----
+This is a high-level overview; individual directories contain additional source files and configuration. The active deployment target is local Kubernetes, not AWS.
 
-# Local Kubernetes Deployment
+## Quick Start
 
-The primary local deployment uses:
+### Prerequisites
 
-- Minikube
-- Kubernetes
-- Helm
-
-The Helm chart contains Kubernetes resources for the application and infrastructure components.
-
-### Helm Chart
-
-```text
-infrastructure/helm/ai-voice-transcriber/
-├── Chart.yaml
-├── values.yaml
-├── dashboards/
-└── templates/
-    ├── api-service.yaml
-    ├── file-service.yaml
-    ├── speech-worker.yaml
-    ├── ai-worker.yaml
-    ├── frontend.yaml
-    ├── postgres.yaml
-    ├── postgres-init.yaml
-    ├── postgres-pvc.yaml
-    ├── rabbitmq.yaml
-    ├── redis.yaml
-    ├── minio.yaml
-    ├── minio-init.yaml
-    ├── ollama.yaml
-    ├── ollama-pvc.yaml
-    ├── ollama-service.yaml
-    ├── secret.yaml
-    ├── configmap.yaml
-    └── grafana-dashboard.yaml
-```
-
----
-
-# Quick Start
-
-## Prerequisites
-
-Install the following tools:
+Install and configure:
 
 - Docker
 - Minikube
-- kubectl
+- `kubectl`
 - Helm
 - Git
 
-Start Minikube if it is not already running:
+### Start the application
+
+From the repository root:
 
 ```bash
 minikube start
-```
-
----
-
-## Start the Project
-
-The project provides a unified startup script:
-
-```bash
 ./start.sh
 ```
 
-The script:
+The startup script is intended to start Minikube if needed, install or upgrade the Helm release, wait for workloads to become ready, and create a port-forward to the frontend.
 
-1. Starts Minikube.
-2. Installs or upgrades the Helm release.
-3. Waits for Kubernetes pods to become ready.
-4. Creates a port-forward to the frontend.
+When startup completes, open:
 
-After successful startup:
+**http://127.0.0.1:8080**
 
-```text
-http://127.0.0.1:8080
-```
-
----
-
-## Stop the Project
+### Stop the application
 
 ```bash
 ./stop.sh
 ```
 
-The script stops the frontend port-forward and Minikube.
+The stop script stops the frontend port-forward and Minikube. Persistent data stored in Kubernetes persistent volumes may remain between runs.
 
----
+## Kubernetes Deployment with Helm
 
-# Helm
+The primary integrated deployment uses Minikube, Kubernetes, and the Helm chart at:
 
-The application is deployed using Helm:
+```text
+infrastructure/helm/ai-voice-transcriber/
+```
+
+Install or upgrade the release:
 
 ```bash
 helm upgrade --install ai-voice-transcriber \
@@ -337,387 +246,204 @@ Validate the chart:
 helm lint infrastructure/helm/ai-voice-transcriber
 ```
 
-Check the deployment:
+Inspect Kubernetes resources:
 
 ```bash
 kubectl get pods
-```
-
-```bash
 kubectl get services
-```
-
-```bash
 kubectl get pvc
 ```
 
----
+The chart configures application and infrastructure workloads, including persistent storage and health probes for supported components.
 
-# Kubernetes Components
+### Persistent components
 
-The Helm deployment includes:
+Persistent volumes are configured for stateful components such as PostgreSQL, MinIO, Ollama, RabbitMQ, and Redis. Ollama's persistent storage allows downloaded models to survive pod restarts. Actual persistence depends on the Kubernetes storage configuration and whether the relevant volumes are retained.
 
-### Application
+## Docker Compose
 
-- Frontend
-- API Service
-- File Service
-- Speech Worker
-- AI Worker
+A Docker Compose environment is also provided for local service execution.
 
-### Infrastructure
-
-- PostgreSQL
-- RabbitMQ
-- Redis
-- MinIO
-- Ollama
-
-### Persistence
-
-Persistent volumes are used for stateful components such as:
-
-- PostgreSQL
-- MinIO
-- Ollama
-- RabbitMQ
-- Redis
-
-Ollama uses a persistent volume so that downloaded models can survive pod restarts.
-
----
-
-# Ollama
-
-Ollama runs inside the Kubernetes cluster as a dedicated service.
-
-The deployment exposes:
-
-```text
-11434
-```
-
-The Ollama deployment includes:
-
-- Persistent storage
-- Startup probe
-- Readiness probe
-- Liveness probe
-- CPU and memory resource limits
-
-The AI worker communicates with Ollama through the internal Kubernetes service.
-
----
-
-# Docker Compose
-
-The repository also contains a Docker Compose environment for local service execution.
+Start:
 
 ```bash
 docker compose up -d
 ```
 
-Stop the Compose environment:
+Stop:
 
 ```bash
 docker compose down
 ```
 
-The Compose stack includes:
+The Compose configuration includes the application's supporting services and workers. **Minikube + Helm is the primary integrated deployment path** documented for this project.
 
-- PostgreSQL
-- RabbitMQ
-- Redis
-- MinIO
-- File Service
-- Speech Worker
-- Ollama
-- AI Worker
-- API Service
+## Configuration and Persistent Data
 
-The Kubernetes deployment is the primary integrated deployment workflow of the project.
+Runtime configuration is supplied through environment variables and Kubernetes configuration resources.
 
----
+Keep credentials and other secrets out of Git. Configure the required local values for items such as:
 
-# Application Ports
+- PostgreSQL credentials and database connection settings
+- RabbitMQ connection settings
+- MinIO credentials
+- Inter-service configuration
+- Ollama endpoint and model settings
 
-Important service ports include:
+Use example configuration files where provided. Do not commit real `.env` files, access tokens, passwords, or private keys.
 
-| Component | Port |
-|---|---:|
-| Frontend | `8080` via port-forward |
-| API Service | `8000` |
-| File Service | `8003` in Docker Compose |
-| AI Worker | `8004` in Docker Compose |
-| PostgreSQL | `5432` |
-| RabbitMQ | `5672` |
-| RabbitMQ Management | `15672` |
-| Redis | `6379` |
-| MinIO API | `9000` |
-| MinIO Console | `9001` |
-| Ollama | `11434` |
+## Monitoring
 
----
-
-# CI
-
-GitHub Actions is used for continuous integration.
-
-The current CI workflow performs:
-
-### Helm validation
-
-```bash
-helm lint infrastructure/helm/ai-voice-transcriber
-```
-
-### Frontend build
-
-```bash
-npm ci
-npm run build
-```
-
-### Docker image builds
-
-CI validates Docker builds for:
-
-- API Service
-- File Service
-- Speech Worker
-- AI Worker
-- Auth Service
-- Frontend
-
-Docker images are built in CI for validation; the current workflow does not push them to a container registry.
-
----
-
-# Monitoring
-
-The project contains a monitoring stack based on:
+The repository contains monitoring configuration based on:
 
 - Prometheus
 - Grafana
 - Loki
 - Promtail / Grafana Alloy
 
-Monitoring configuration is located under:
+Monitoring-related configuration is stored under `monitoring/`. Grafana dashboards and Loki-related resources are also integrated with the Helm deployment.
 
-```text
-monitoring/
-```
+This describes the monitoring configuration included in the project; it does not imply that an external hosted monitoring service is used.
 
-Grafana dashboards and Loki-related configuration are also integrated into the Helm deployment.
+## Testing
 
----
+The repository contains automated tests for backend components, plus frontend tests and build validation in CI.
 
-# Testing
+The CI workflow includes Python test jobs for the API, authentication, file, speech, and AI-worker components. A PostgreSQL service container is provided where required by tests. The frontend job runs its tests and production build.
 
-The repository contains tests and service-level validation for the application components.
-
-Examples include:
-
-```text
-services/api-service/tests/
-services/auth-service/tests/
-services/speech-worker/test_db.py
-services/speech-worker/test_transcription.py
-services/speech-worker/test_whisper.py
-services/file-service/test_minio.py
-```
-
-CI additionally validates:
-
-- Helm chart
-- Frontend build
-- Docker image builds
-
----
-
-# Development
-
-Backend services use Python and FastAPI.
-
-Several Python services use `uv` for dependency management.
-
-Example service structure:
+Relevant source areas include:
 
 ```text
 services/api-service/
-├── app/
-├── alembic/
-├── tests/
-├── Dockerfile
-├── pyproject.toml
-└── uv.lock
+services/auth-service/
+services/file-service/
+services/speech-worker/
+services/ai-worker/
+frontend/
 ```
 
-The shared package provides reusable components for:
+The exact commands and test selection are defined in the service configuration and `.github/workflows/ci.yml`.
 
-- clients
-- models
-- schemas
-- security
-- utilities
+## CI/CD Pipeline
 
----
+GitHub Actions automates code validation, security checks, container image builds, and deployment to a configured local Kubernetes environment.
 
-# Data Flow
+Workflow definition: `.github/workflows/ci.yml`.
 
-The main transcription flow is:
+### Pipeline stages
+
+1. **Secret scanning — Gitleaks**
+   - Checks repository changes for accidentally committed secrets.
+
+2. **Backend tests**
+   - Runs Python tests for API, authentication, file, speech, and AI-worker components.
+   - Uses a PostgreSQL service container for tests that require a database.
+
+3. **Frontend validation**
+   - Installs frontend dependencies.
+   - Runs frontend tests.
+   - Builds production frontend assets.
+
+4. **Dependency vulnerability scanning — OSV-Scanner**
+   - Scans project dependencies for known vulnerabilities.
+
+5. **Helm validation**
+   - Runs Helm chart linting and template rendering.
+
+6. **Kubernetes manifest validation — Kubeconform**
+   - Validates rendered Kubernetes manifests against Kubernetes schemas.
+
+7. **Docker image build and security scan**
+   - Builds six images: API Service, Auth Service, File Service, Speech Worker, AI Worker, and Frontend.
+   - Scans the built images with Trivy.
+
+8. **Publish images to GitHub Container Registry**
+   - On pushes to `main`, the workflow publishes the images to GHCR when the image build and scan jobs succeed.
+
+9. **Local Kubernetes deployment**
+   - A deployment job runs on a configured **self-hosted GitHub Actions runner** with access to the local Minikube cluster.
+   - Helm performs an install or upgrade and waits for the release resources to become ready.
+   - The workflow checks deployment availability and runs smoke checks against the API and authentication health endpoints.
+   - If deployment or smoke checks fail, the workflow attempts to roll back to the previous Helm revision. If the release was being installed for the first time, the failed release is removed.
+
+### Pipeline flow
 
 ```text
-1. User uploads audio
+Push / Pull Request
         │
         ▼
-2. API / File Service
+Secret scanning + tests + frontend validation
         │
         ▼
-3. MinIO stores the audio file
+Dependency vulnerability scan
         │
         ▼
-4. Message is published to RabbitMQ
+Helm lint / template + Kubeconform
         │
         ▼
-5. Speech Worker consumes the message
+Build six Docker images + Trivy scans
+        │
+        ├── On push to main: publish images to GHCR
         │
         ▼
-6. Faster-Whisper processes the audio
+Self-hosted runner with Minikube access
         │
         ▼
-7. Transcription is stored in PostgreSQL
+Helm install / upgrade and readiness checks
         │
         ▼
-8. AI Worker processes text
+API and authentication health smoke checks
         │
-        ▼
-9. Ollama performs local LLM processing
+        ├── Success: deployment job completes
+        └── Failure: rollback / cleanup attempt
 ```
 
----
+### Deployment runner requirements
 
-# Configuration
+The local deployment job depends on a self-hosted GitHub Actions runner configured with the necessary tools and access to the target Minikube cluster. A GitHub-hosted runner cannot automatically access a Minikube cluster running on the developer's local machine.
 
-Runtime configuration is provided through environment variables and Kubernetes configuration resources.
+The deployment workflow therefore depends on the self-hosted runner being online and correctly configured. Other CI checks validate code, manifests, and images independently of the local cluster.
 
-Sensitive credentials should not be committed to Git.
+## Security
 
-Use local configuration for:
+Security-related CI controls include:
 
-- PostgreSQL credentials
-- RabbitMQ credentials
-- MinIO credentials
-- database configuration
-- service configuration
+- **Gitleaks** for secret detection.
+- **OSV-Scanner** for dependency vulnerability scanning.
+- **Trivy** for container image vulnerability scanning.
+- **Kubeconform** for Kubernetes manifest validation.
 
----
+These checks help identify common issues but do not guarantee that an application or its dependencies are free of vulnerabilities. Credentials must be managed outside version control.
 
-# Documentation
+## Documentation
 
-Project documentation is organized under:
+The `docs/` directory contains:
 
-```text
-docs/
-```
+- `01-architecture/Architecture-Design-Document.md` — architecture documentation.
+- `02-requirements/System-Requirements-Specification.md` — system requirements specification.
+- `README.md` — documentation index.
 
-Main documentation areas include:
+This root README is the main entry point for setup, deployment, CI/CD, and project scope. AWS is outside the current implemented deployment scope.
 
-```text
-01-architecture
-02-requirements
-03-api
-04-database
-05-deployment
-06-monitoring
-07-security
-08-testing
-09-aws
-10-adr
-diagrams
-```
+## Current Scope and Project Status
 
-The `09-aws` section is retained as project/reference documentation and does **not** represent the current production deployment target.
+The project is being finalized as a local DevOps / Kubernetes portfolio project. It includes:
 
----
+- React frontend and FastAPI-based services.
+- Audio storage and asynchronous transcription.
+- Faster-Whisper speech recognition.
+- Local Ollama integration for AI text processing.
+- PostgreSQL, RabbitMQ, Redis, and MinIO.
+- Docker and Docker Compose configuration.
+- Kubernetes deployment through Minikube and Helm.
+- Persistent volumes and Kubernetes health probes.
+- Monitoring configuration.
+- Automated tests and CI security / validation checks.
+- Docker image publishing to GHCR on pushes to `main`.
+- Deployment automation to a configured local Minikube cluster through a self-hosted runner.
 
-# DevOps Focus
+The current implemented deployment target is local Kubernetes. **AWS EKS, ECR, RDS, and S3 are outside the current deployment scope.**
 
-This project demonstrates practical DevOps concepts:
+## License
 
-- Microservice architecture
-- Containerization
-- Docker image creation
-- Docker Compose
-- Kubernetes
-- Minikube
-- Helm
-- Persistent Volumes
-- Kubernetes health probes
-- Service discovery
-- Asynchronous messaging
-- CI automation
-- Docker build validation
-- Infrastructure organization
-- Monitoring and observability
-- Local AI infrastructure
-- Reproducible local deployment
-
----
-
-# Current Scope
-
-The project is intentionally focused on a **local Kubernetes environment**.
-
-Current deployment target:
-
-```text
-Local machine
-     │
-     ├── Docker
-     ├── Minikube
-     └── Kubernetes
-            │
-            └── Helm
-                 │
-                 ├── Application services
-                 ├── Databases
-                 ├── Message broker
-                 ├── Object storage
-                 ├── Redis
-                 ├── Ollama
-                 └── Monitoring
-```
-
-Cloud infrastructure such as AWS EKS, ECR, RDS and S3 is **not part of the current implemented deployment scope**.
-
----
-
-# Project Status
-
-The project currently contains:
-
-- Microservice backend
-- React frontend
-- File storage
-- PostgreSQL persistence
-- RabbitMQ messaging
-- Faster-Whisper transcription
-- Ollama integration
-- Docker configuration
-- Kubernetes deployment
-- Helm chart
-- Persistent storage
-- Health probes
-- Local unified startup / shutdown scripts
-- Monitoring infrastructure
-- GitHub Actions CI
-- Docker build validation
-
-The project is being finalized as a local DevOps / Kubernetes portfolio project.
-
----
-
-# License
-
-See [`LICENSE`](LICENSE).
+This project is licensed under the MIT License. See [`LICENSE`](LICENSE).
