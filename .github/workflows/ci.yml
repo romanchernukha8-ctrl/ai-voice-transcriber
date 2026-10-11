@@ -312,6 +312,8 @@ jobs:
           REGISTRY="ghcr.io/${OWNER_LC}"
 
           helm upgrade --install "$RELEASE_NAME" \
+            --server-side=true \
+            --force-conflicts \
             infrastructure/helm/ai-voice-transcriber \
             --namespace "$NAMESPACE" \
             --wait \
