@@ -372,7 +372,7 @@ jobs:
 
           kubectl logs "$POD" -n "$NAMESPACE"
 
-            - name: Roll back on deployment failure
+      - name: Roll back on deployment failure
         if: failure()
         shell: bash
         run: |
