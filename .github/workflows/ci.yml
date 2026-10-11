@@ -47,6 +47,17 @@ jobs:
             infrastructure/helm/ai-voice-transcriber \
             > /tmp/rendered.yaml
 
+      - name: Install Kubeconform
+        run: |
+          VERSION="0.7.0"
+          curl -sSfL "https://github.com/yannh/kubeconform/releases/download/v${VERSION}/kubeconform-linux-amd64.tar.gz" \
+            -o /tmp/kubeconform.tar.gz
+          tar -xzf /tmp/kubeconform.tar.gz -C /tmp kubeconform
+          sudo install /tmp/kubeconform /usr/local/bin/kubeconform
+
+      - name: Validate Kubernetes manifests
+        run: kubeconform -strict -summary /tmp/rendered.yaml
+
   frontend-build:
     name: Frontend Tests and Build
     runs-on: ubuntu-latest
