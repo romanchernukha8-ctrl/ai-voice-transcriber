@@ -1,0 +1,444 @@
+name: CI/CD
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  secret-scan:
+    name: Secret Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  helm-lint:
+    name: Helm Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+
+      - name: Helm lint
+        run: helm lint infrastructure/helm/ai-voice-transcriber
+
+      - name: Render Helm templates
+        run: |
+          helm template ai-voice-transcriber \
+            infrastructure/helm/ai-voice-transcriber \
+            > /tmp/rendered.yaml
+
+      - name: Install Kubeconform
+        run: |
+          VERSION="0.7.0"
+          curl -sSfL "https://github.com/yannh/kubeconform/releases/download/v${VERSION}/kubeconform-linux-amd64.tar.gz" \
+            -o /tmp/kubeconform.tar.gz
+          tar -xzf /tmp/kubeconform.tar.gz -C /tmp kubeconform
+          sudo install /tmp/kubeconform /usr/local/bin/kubeconform
+
+      - name: Validate Kubernetes manifests
+        run: kubeconform -strict -summary /tmp/rendered.yaml
+
+  frontend-build:
+    name: Frontend Tests and Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run frontend tests
+        working-directory: frontend
+        run: npm test -- --run --coverage
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+  python-tests:
+    name: Python Tests (${{ matrix.name }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      # Показываем падения всех сервисов сразу, а не только первого
+      fail-fast: false
+      matrix:
+        include:
+          - name: api-service
+            path: services/api-service
+            type: uv
+          - name: auth-service
+            path: services/auth-service
+            type: uv
+          - name: file-service
+            path: services/file-service
+            type: uv
+          - name: speech-worker
+            path: services/speech-worker
+            type: uv
+          - name: ai-worker
+            path: services/ai-worker
+            type: pip
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: test
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U test -d test"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      RABBITMQ_HOST: localhost
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: test
+      RABBITMQ_PASSWORD: test
+      MINIO_ENDPOINT: localhost:9000
+      MINIO_ACCESS_KEY: test
+      MINIO_SECRET_KEY: test
+      MINIO_BUCKET: test
+      MINIO_SECURE: "false"
+      DATABASE_HOST: localhost
+      DATABASE_PORT: 5432
+      DATABASE_NAME: test
+      DATABASE_USER: test
+      DATABASE_PASSWORD: test
+      FILE_DATABASE_NAME: test
+      AUTH_DATABASE_NAME: test
+      JWT_SECRET_KEY: ci-test-secret-key-not-for-production
+      JWT_ALGORITHM: HS256
+      JWT_ACCESS_TOKEN_EXPIRE_MINUTES: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup uv
+        if: matrix.type == 'uv'
+        uses: astral-sh/setup-uv@v7
+
+      - name: Run uv tests
+        if: matrix.type == 'uv'
+        working-directory: ${{ matrix.path }}
+        run: |
+          # --locked: CI падает, если uv.lock не совпадает с pyproject.toml
+          uv sync --locked --dev
+          uv run pytest -v
+
+      - name: Setup Python
+        if: matrix.type == 'pip'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: ${{ matrix.path }}/requirements.txt
+
+      - name: Install AI Worker dependencies
+        if: matrix.type == 'pip'
+        working-directory: ${{ matrix.path }}
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run AI Worker tests
+        if: matrix.type == 'pip'
+        working-directory: ${{ matrix.path }}
+        run: pytest -v
+
+  dependency-scan:
+    name: Dependency Vulnerability Scan
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@v2.6.0
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    with:
+      scan-args: |-
+        --recursive
+        ./
+
+  docker-build:
+    name: Build, Scan and Publish (${{ matrix.name }})
+    # Образы собираются и публикуются только после всех проверок
+    needs: [secret-scan, helm-lint, frontend-build, python-tests, dependency-scan]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - name: api-service
+            context: .
+            dockerfile: ./services/api-service/Dockerfile
+          - name: file-service
+            context: .
+            dockerfile: ./services/file-service/Dockerfile
+          - name: speech-worker
+            context: .
+            dockerfile: ./services/speech-worker/Dockerfile
+          - name: ai-worker
+            context: ./services/ai-worker
+            dockerfile: ./services/ai-worker/Dockerfile
+          - name: auth-service
+            context: .
+            dockerfile: ./services/auth-service/Dockerfile
+          - name: frontend
+            context: ./frontend
+            dockerfile: ./frontend/Dockerfile
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: false
+          load: true
+          tags: ai-voice-transcriber-${{ matrix.name }}:ci
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
+      - name: Scan Docker image with Trivy
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ai-voice-transcriber-${{ matrix.name }}:ci
+          format: table
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish image to GHCR
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          IMAGE_NAME: ${{ matrix.name }}
+          IMAGE_TAG: ${{ github.sha }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          OWNER_LC="$(printf '%s' "$OWNER" | tr '[:upper:]' '[:lower:]')"
+          IMAGE="ghcr.io/${OWNER_LC}/ai-voice-transcriber-${IMAGE_NAME}"
+
+          docker tag "ai-voice-transcriber-${IMAGE_NAME}:ci" "${IMAGE}:${IMAGE_TAG}"
+          docker push "${IMAGE}:${IMAGE_TAG}"
+
+  helm-deploy:
+    name: Deploy to Minikube
+    needs: [secret-scan, helm-lint, frontend-build, python-tests, dependency-scan, docker-build]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, linux]
+    timeout-minutes: 15
+    # Два деплоя параллельно ломают логику отката по PREVIOUS_REVISION
+    concurrency:
+      group: deploy-minikube
+      cancel-in-progress: false
+
+    env:
+      RELEASE_NAME: ai-voice-transcriber
+      NAMESPACE: default
+      PREVIOUS_REVISION: "0"
+      DEPLOY_STARTED: "false"
+      JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check deployment prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ -z "$JWT_SECRET_KEY" ]; then
+            echo "::error::Add JWT_SECRET_KEY in repository Actions secrets."
+            exit 1
+          fi
+
+          command -v kubectl
+          command -v helm
+          kubectl cluster-info
+          kubectl get nodes
+
+          if helm status "$RELEASE_NAME" -n "$NAMESPACE" >/dev/null 2>&1; then
+            echo "Existing Helm release found."
+          else
+            echo "No existing Helm release; first installation will be attempted."
+          fi
+
+      - name: Record current Helm revision
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if helm status "$RELEASE_NAME" -n "$NAMESPACE" >/dev/null 2>&1; then
+            REVISION="$(helm history "$RELEASE_NAME" -n "$NAMESPACE" -o json \
+              | python3 -c 'import json,sys; rows=json.load(sys.stdin); valid=[int(r["revision"]) for r in rows if r.get("status", "").lower() in {"deployed", "superseded"}]; print(max(valid) if valid else 0)')"
+
+            if [ "$REVISION" -le 0 ]; then
+              echo "::error::Existing Helm release found, but no successful revision could be determined. Aborting before deployment."
+              exit 1
+            fi
+
+            echo "PREVIOUS_REVISION=$REVISION" >> "$GITHUB_ENV"
+            echo "Last successful Helm revision: $REVISION"
+          else
+            echo "PREVIOUS_REVISION=0" >> "$GITHUB_ENV"
+            echo "No existing Helm release; first installation will be attempted."
+          fi
+
+      - name: Deploy with Helm
+        env:
+          OWNER: ${{ github.repository_owner }}
+          IMAGE_TAG: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Откат разрешён только начиная с этой точки
+          echo "DEPLOY_STARTED=true" >> "$GITHUB_ENV"
+
+          OWNER_LC="$(printf '%s' "$OWNER" | tr '[:upper:]' '[:lower:]')"
+          REGISTRY="ghcr.io/${OWNER_LC}"
+
+          helm upgrade --install "$RELEASE_NAME" \
+            infrastructure/helm/ai-voice-transcriber \
+            --namespace "$NAMESPACE" \
+            --server-side=true \
+            --force-conflicts \
+            --wait \
+            --timeout 5m \
+            --set-string "images.api.repository=${REGISTRY}/ai-voice-transcriber-api-service" \
+            --set-string "images.api.tag=${IMAGE_TAG}" \
+            --set-string "images.fileService.repository=${REGISTRY}/ai-voice-transcriber-file-service" \
+            --set-string "images.fileService.tag=${IMAGE_TAG}" \
+            --set-string "images.speechWorker.repository=${REGISTRY}/ai-voice-transcriber-speech-worker" \
+            --set-string "images.speechWorker.tag=${IMAGE_TAG}" \
+            --set-string "images.aiWorker.repository=${REGISTRY}/ai-voice-transcriber-ai-worker" \
+            --set-string "images.aiWorker.tag=${IMAGE_TAG}" \
+            --set-string "images.authService.repository=${REGISTRY}/ai-voice-transcriber-auth-service" \
+            --set-string "images.authService.tag=${IMAGE_TAG}" \
+            --set-string "images.frontend.repository=${REGISTRY}/ai-voice-transcriber-frontend" \
+            --set-string "images.frontend.tag=${IMAGE_TAG}" \
+            --set services.auth.port=8000 \
+            --set services.auth.targetPort=8000 \
+            --set minio.persistenceSize=10Gi \
+            --set "imagePullSecrets[0].name=ghcr-pull-secret" \
+            --set-string "secrets.jwtSecretKey=${JWT_SECRET_KEY}" \
+            --set-string secrets.jwtAlgorithm=HS256 \
+            --set secrets.jwtAccessTokenExpireMinutes=30
+
+      - name: Wait for application deployments
+        shell: bash
+        run: |
+          set -euo pipefail
+          kubectl wait \
+            --for=condition=Available \
+            deployment \
+            -l "app.kubernetes.io/instance=${RELEASE_NAME}" \
+            -n "$NAMESPACE" \
+            --timeout=180s
+
+      - name: Smoke test API and Auth
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          POD="ci-smoke-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          # Логи пода выводятся при любом исходе, затем под удаляется
+          trap 'kubectl logs "$POD" -n "$NAMESPACE" 2>&1 || true; kubectl delete pod "$POD" -n "$NAMESPACE" --ignore-not-found --wait=false >/dev/null 2>&1 || true' EXIT
+
+          kubectl run "$POD" \
+            --namespace "$NAMESPACE" \
+            --image=curlimages/curl:8.12.1 \
+            --restart=Never \
+            --command -- sh -ec '
+              curl --retry 15 --retry-delay 2 --retry-connrefused -fsS http://api-service:8000/health
+              curl --retry 15 --retry-delay 2 --retry-connrefused -fsS http://auth-service:8000/health
+            '
+
+          kubectl wait \
+            --for=jsonpath='{.status.phase}'=Succeeded \
+            "pod/$POD" \
+            -n "$NAMESPACE" \
+            --timeout=90s
+
+      - name: Collect diagnostics
+        if: failure() && env.DEPLOY_STARTED == 'true'
+        shell: bash
+        run: |
+          # Снимаем состояние ДО отката, иначе улики исчезнут
+          kubectl get pods -n "$NAMESPACE" -o wide || true
+          kubectl get events -n "$NAMESPACE" --sort-by=.lastTimestamp | tail -n 40 || true
+          kubectl describe pods -n "$NAMESPACE" -l "app.kubernetes.io/instance=${RELEASE_NAME}" | tail -n 120 || true
+          kubectl logs -n "$NAMESPACE" -l "app.kubernetes.io/instance=${RELEASE_NAME}" \
+            --all-containers --prefix --tail=40 --ignore-errors=true || true
+
+      - name: Roll back on deployment failure
+        if: failure() && env.DEPLOY_STARTED == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "$PREVIOUS_REVISION" -gt 0 ]; then
+            echo "Rolling back to Helm revision $PREVIOUS_REVISION"
+            if ! helm rollback "$RELEASE_NAME" "$PREVIOUS_REVISION" \
+              -n "$NAMESPACE" --wait --timeout 5m; then
+              echo "::error::Helm rollback failed. Manual recovery is required."
+              exit 1
+            fi
+          else
+            echo "::warning::First installation failed; no previous revision to roll back to. Release left in place for inspection (helm status / kubectl describe)."
+          fi
